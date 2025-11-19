@@ -24,6 +24,49 @@ NOTES:
             "House of Habsburg"
             "Paris family"
 
+        Questionable dates, probably hard to search for:
+            "Thomas Aquinas, Saint (1225?-1274)"
+
+
+    Places:
+
+
+    Times:
+        No end time, can become ambiguous
+            "1945-"
+
+        Descriptions in times:
+            "Civil War, 1861-1865"
+            "To 1763 (New France)"
+            (recommend: Removing descriptions and placing them in a their own tag)
+
+        Approximate times:
+            "Primitive and early church, ca. 30-600"
+
+        Non-standard:
+            "To 1800"                       # should be "-1800" ?
+            "15th century"                  # should be 1400-1499?
+            "sixteenth century"             # should be 1500-1599
+            "From the 1970s into 1990s."    # Should be 1970-1999
+            "1854-60 / Victorian Era / 19th Century"    # 1854-1860, remove "Victorian Era" and "19th Century"
+
+        Non-english:
+            "21e siècle"    # French for 21st Century, will probably not match english searches
+
+        No actual dates:
+            "Quaternary"
+            "Cretaceous"                    # Should be "Cretaceous Period" ??
+            "War of 1812"                   # Should be the years of the war
+            "A autobiography of a paranormal life till the age of 43."
+
+        How to match with an ASCII search?
+            "Chosŏn dynasty, 1392-1910"
+
+        How to specify a time that ends in BC? "-300--200" ?
+            "1100 BCE"
+            "281-146 B.C."
+            "Greco Roman period, 332 B.C.-640 A.D."
+
 
     Use consistent naming:
         all lowercase
