@@ -37,6 +37,8 @@ import requests
 #
 # GLOBALS
 #
+DEBUG = False
+DEBUG_QUANTA = 10_000
 DEFAULT_LINE_LIMIT = 0
 DEFAULT_FILENAME = "works.txt"
 DEFAULT_WORKS_URL = "https://openlibrary.org/data/ol_dump_works_latest.txt.gz"
@@ -64,45 +66,45 @@ def Timer(name: str):
         # print(f"{name} took {diff_ms:,} ms")
 
 
-@dataclass
-class AuthorRole:
-    type: dict
-    author: dict
+# @dataclass
+# class AuthorRole:
+#    type: dict
+#    author: dict
 
 
 @dataclass
 class Work:
     type: str
     id: str
-    revision: int
+    # revision: int
     last_modified: str
 
-    title: Optional[str] = None
-    subtitle: Optional[str] = None
+    # title: Optional[str] = None
+    # subtitle: Optional[str] = None
 
-    authors: list[AuthorRole] = field(default_factory=list)
-    translated_titles: list[str] = field(default_factory=list)
+    # authors: list[AuthorRole] = field(default_factory=list)
+    # translated_titles: list[str] = field(default_factory=list)
     subjects: list[str] = field(default_factory=list)
     subject_places: list[str] = field(default_factory=list)
     subject_times: list[str] = field(default_factory=list)
     subject_people: list[str] = field(default_factory=list)
-    description: Optional[str] = None
-    dewey_number: list[str] = field(default_factory=list)
-    lc_classifications: list[str] = field(default_factory=list)
-    first_sentence: Optional[str] = None
-    original_languages: list[str] = field(default_factory=list)
-    other_titles: list[str] = field(default_factory=list)
-    first_publish_date: Optional[str] = None
-    links: list[dict] = field(default_factory=list)
-    notes: Optional[str] = None
-    cover_edition: Optional[dict] = None
-    covers: list[int] = field(default_factory=list)
-    latest_revision: Optional[int] = None
-    created: Optional[dict] = None
-    key: Optional[str] = None
+    # description: Optional[str] = None
+    # dewey_number: list[str] = field(default_factory=list)
+    # lc_classifications: list[str] = field(default_factory=list)
+    # first_sentence: Optional[str] = None
+    # original_languages: list[str] = field(default_factory=list)
+    # other_titles: list[str] = field(default_factory=list)
+    # first_publish_date: Optional[str] = None
+    # links: list[dict] = field(default_factory=list)
+    # notes: Optional[str] = None
+    # cover_edition: Optional[dict] = None
+    # covers: list[int] = field(default_factory=list)
+    # latest_revision: Optional[int] = None
+    # created: Optional[dict] = None
+    # key: Optional[str] = None
 
 
-#
+
 # FUNCTIONS
 #
 def main():
@@ -111,8 +113,11 @@ def main():
     """
     args = get_args()
 
+    global DEBUG
+    DEBUG = args.debug
+
     if args.download:
-        works = download_and_parse()
+        works = download_and_parse(output_path=args.filename, line_limit=args.limit)
     else:
         works = parse_works_file(file_path=args.filename, line_limit=args.limit)
 
@@ -204,6 +209,10 @@ def parse_works_file(file_path: str = DEFAULT_FILENAME, line_limit: int = DEFAUL
                 if line_limit and i >= line_limit:
                     break
 
+                if DEBUG:
+                    if i % DEBUG_QUANTA == 0:
+                        print(f"loaded {i:,} items")
+
                 work = parse_line(line)
                 ret.append(work)
 
@@ -235,30 +244,30 @@ def parse_line(line: str) -> Optional[Work]:
         ret = Work(
             type=work_type,
             id=work_id,
-            revision=revision,
+            # revision=revision,
             last_modified=last_modified,
-            title=parsed.get("title"),
-            subtitle=parsed.get("subtitle"),
-            authors=parsed.get("authors", []),
-            translated_titles=parsed.get("translated_titles", []),
+            # title=parsed.get("title"),
+            # subtitle=parsed.get("subtitle"),
+            # authors=parsed.get("authors", []),
+            # translated_titles=parsed.get("translated_titles", []),
             subjects=parsed.get("subjects", []),
             subject_places=parsed.get("subject_places", []),
             subject_times=parsed.get("subject_times", []),
             subject_people=parsed.get("subject_people", []),
-            description=parsed.get("description"),
-            dewey_number=parsed.get("dewey_number", []),
-            lc_classifications=parsed.get("lc_classifications", []),
-            first_sentence=parsed.get("first_sentence"),
-            original_languages=parsed.get("original_languages", []),
-            other_titles=parsed.get("other_titles", []),
-            first_publish_date=parsed.get("first_publish_date"),
-            links=parsed.get("links", []),
-            notes=parsed.get("notes"),
-            cover_edition=parsed.get("cover_edition"),
-            covers=parsed.get("covers", []),
-            latest_revision=parsed.get("latest_revision"),
-            created=parsed.get("created"),
-            key=parsed.get("key"),
+            # description=parsed.get("description"),
+            # dewey_number=parsed.get("dewey_number", []),
+            # lc_classifications=parsed.get("lc_classifications", []),
+            # first_sentence=parsed.get("first_sentence"),
+            # original_languages=parsed.get("original_languages", []),
+            # other_titles=parsed.get("other_titles", []),
+            # first_publish_date=parsed.get("first_publish_date"),
+            # links=parsed.get("links", []),
+            # notes=parsed.get("notes"),
+            # cover_edition=parsed.get("cover_edition"),
+            # covers=parsed.get("covers", []),
+            # latest_revision=parsed.get("latest_revision"),
+            # created=parsed.get("created"),
+            # key=parsed.get("key"),
         )
         return ret
 
@@ -276,11 +285,10 @@ def get_args(the_args: Optional[list[str]] = None) -> argparse.Namespace:
 
     arg_parser = argparse.ArgumentParser()
 
+    arg_parser.add_argument("--debug", action="store_true", default=DEBUG, help="Enable debug mode")
     arg_parser.add_argument("--download", action="store_true", default=False, help="Download a new file")
     arg_parser.add_argument("--filename", type=str, default=DEFAULT_FILENAME, help="Filename to parse")
-    arg_parser.add_argument(
-        "--limit", type=int, default=DEFAULT_LINE_LIMIT, help="Number of lines to parse from the file"
-    )
+    arg_parser.add_argument("--limit", type=int, default=DEFAULT_LINE_LIMIT, help="Number of lines to parse")
 
     args, _ = arg_parser.parse_known_args(the_args)
     return args

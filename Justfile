@@ -116,15 +116,6 @@ healthy:
     just lint && \
     just typecheck
 
-run-tags args:
-    @python tags.py {{args}}
-
-run-client args:
-    @python client.py {{args}}
-
-run-server args:
-    @python server.py {{args}}
-
-run-training args:
-    @python train.py {{args}}
+run args='':
+    @python main.py {{args}}
 
