@@ -1,6 +1,20 @@
 
 QUICK START:
 
+
+```
+# To initialize
 brew install just
-alias tags='just run-tags --'
+just init
+alias tags='just run'
+```
+
+```
+# To download the latest file
 tags --download
+```
+
+```
+# To run the analysis on the latest file
+tags
+```
