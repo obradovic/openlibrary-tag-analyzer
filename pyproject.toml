@@ -11,6 +11,7 @@ dependencies = [
     "ty>=0.0.1a25",
     "ray==2.51.1",
     "ray[serve]==2.51.1",
+    "lingua-language-detector==2.1.1",
     "orjson==3.11.4",
     "requests",
     "numpy==2.3.4",
