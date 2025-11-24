@@ -47,17 +47,62 @@ DEBUG_OUTPUT_QUANTA = 250_000
 DEFAULT_LINE_LIMIT = 0
 DEFAULT_FILENAME = "works.txt"
 DEFAULT_WORKS_URL = "https://openlibrary.org/data/ol_dump_works_latest.txt.gz"
-LANGUAGE_DETECTOR: LanguageDetector | None = None
+EMPTY = ""
+ENGLISH_DETECTOR: LanguageDetector | None
+LANGUAGE_DETECTOR: LanguageDetector | None
 
 
 #
 # TYPES
 #
+T = TypeVar("T")
+Strings = list[str]
+
+# @dataclass
+# class AuthorRole:
+#    type: dict
+#    author: dict
+
+
+@dataclass
+class Work:
+    # type: str     # This is always "/type/work"
+    id: str
+    last_modified: datetime
+
+    subjects: Strings = field(default_factory=list)
+    subject_places: Strings = field(default_factory=list)
+    subject_times: Strings = field(default_factory=list)
+    subject_people: Strings = field(default_factory=list)
+
+    # revision: int
+    # title: Optional[str] = None
+    # subtitle: Optional[str] = None
+    # authors: list[AuthorRole] = field(default_factory=list)
+    # translated_titles: Strings = field(default_factory=list)
+    # description: Optional[str] = None
+    # dewey_number: Strings = field(default_factory=list)
+    # lc_classifications: Strings = field(default_factory=list)
+    # first_sentence: Optional[str] = None
+    # original_languages: Strings = field(default_factory=list)
+    # other_titles: Strings = field(default_factory=list)
+    # first_publish_date: Optional[datetime] = None
+    # links: list[dict] = field(default_factory=list)
+    # notes: Optional[str] = None
+    # cover_edition: Optional[dict] = None
+    # covers: list[int] = field(default_factory=list)
+    # latest_revision: Optional[int] = None
+    created: datetime | None = None
+    # key: Optional[str] = None
+
+
+Works = list[Work]
+TagsToWorks = dict[str, Works]
+
+
 @contextmanager
 def Timer(name: str):
     start_time = time.time()
-    time.sleep(1.5)
-    end_time = time.time()
 
     try:
         print(f"{name} ...")
@@ -73,53 +118,6 @@ def Timer(name: str):
         # print(f"{name} took {diff_ms:,} ms")
 
 
-# @dataclass
-# class AuthorRole:
-#    type: dict
-#    author: dict
-
-
-@dataclass
-class Work:
-    # type: str     # This is always "/type/work"
-    id: str
-    last_modified: datetime
-
-    subjects: list[str] = field(default_factory=list)
-    subject_places: list[str] = field(default_factory=list)
-    subject_times: list[str] = field(default_factory=list)
-    subject_people: list[str] = field(default_factory=list)
-
-    # revision: int
-    # title: Optional[str] = None
-    # subtitle: Optional[str] = None
-    # authors: list[AuthorRole] = field(default_factory=list)
-    # translated_titles: list[str] = field(default_factory=list)
-    # description: Optional[str] = None
-    # dewey_number: list[str] = field(default_factory=list)
-    # lc_classifications: list[str] = field(default_factory=list)
-    # first_sentence: Optional[str] = None
-    # original_languages: Strings = field(default_factory=list)
-    # other_titles: list[str] = field(default_factory=list)
-    # first_publish_date: Optional[datetime] = None
-    # links: list[dict] = field(default_factory=list)
-    # notes: Optional[str] = None
-    # cover_edition: Optional[dict] = None
-    # covers: list[int] = field(default_factory=list)
-    # latest_revision: Optional[int] = None
-    created: datetime | None = None
-    # key: Optional[str] = None
-
-
-#
-# TYPE ALIASES
-#
-T = TypeVar("T")
-Works = list[Work]
-Strings = list[str]
-TagsToWorks = dict[str, Works]
-
-
 #
 # FUNCTIONS
 #
@@ -128,8 +126,7 @@ def main():
     This is main
     """
     args = get_args()
-    set_debug(args.debug)
-    initialize_language_detector()
+    initialize(args)
 
     if args.download:
         ok = download(file_path=args.filename, line_limit=args.limit)
@@ -148,11 +145,12 @@ def analyze_tags(works: Works):
     fix_dicts_in_subjects(works)
 
     # invert into a map of tags-to-works
-    tags_to_works = index_works_by_subject(works)
+    tags_to_works = get_tags_to_works(works)
 
     # sort by "number of items in the list"
     tags_by_size = sorted(tags_to_works.keys(), key=lambda tag: len(tags_to_works[tag]), reverse=True)
     tags_to_size = {x: len(tags_to_works[x]) for x in tags_by_size}
+    display_histogram(tags_to_size)
 
     # sort by keys in alphabetical order
     tags_by_alphabetical = sorted(tags_by_size)
@@ -181,10 +179,11 @@ def analyze_tags(works: Works):
     print(f"Places:  {count_places:<12,} / {count_all:<14,} is {count_places / count_all:.1%}")
     print(f"Times:   {count_times:<12,} / {count_all:<14,} is {count_times / count_all:.1%}")
 
-    display_histogram(tags_to_size)
-
     # inspect the languages
     tags_to_languages, languages_to_tags = analyze_languages(tags_by_alphabetical)
+    languages_to_counts = {x: len(y) for x, y in languages_to_tags.items()}
+    languages_to_counts_sorted = dict(sorted(languages_to_counts.items(), key=lambda x: x[1], reverse=True))
+    print(languages_to_counts_sorted)
 
     """
     # Normalize and count
@@ -275,6 +274,22 @@ def display_histogram(tags_to_size: dict[str, int], width: int = 50) -> None:
         print(f"{label:>8} | {bar} ({count:,})")
 
 
+#
+# LANGUAGES
+#
+def initialize_language_detector() -> None:
+    """
+    Initializes the language detector
+    """
+    global ENGLISH_DETECTOR, LANGUAGE_DETECTOR
+
+    with Timer("Building language detector"):
+        # Uses ALL languages
+        ENGLISH_DETECTOR = LanguageDetectorBuilder.from_languages(Language.ENGLISH).build()
+        LANGUAGE_DETECTOR = LanguageDetectorBuilder.from_all_languages().build()
+        # LANGUAGE_DETECTOR = LanguageDetectorBuilder.from_all_languages().with_preloaded_language_models().build()
+
+
 def analyze_languages(tags: Strings) -> tuple[dict[str, Language], dict[Language, Strings]]:
     """
     Returns two dicts,
@@ -296,72 +311,23 @@ def analyze_language(string: str) -> Language | None:
     """
     Figures out what language this is in
     """
-    if not LANGUAGE_DETECTOR:
+    if ENGLISH_DETECTOR is None or LANGUAGE_DETECTOR is None:
         print("ERROR: Please initialize language detector")
         return None
 
+    # first we try english, most of the tags are english and lingua's a little wierd about this?
+    language = ENGLISH_DETECTOR.detect_language_of(string)
+    if language == Language.ENGLISH:
+        return language
+
+    # if its NOT english, try to infer what it is
     language = LANGUAGE_DETECTOR.detect_language_of(string)
     return language
 
 
-def initialize_language_detector() -> None:
-    """
-    Initializes the language detector
-    """
-    global LANGUAGE_DETECTOR
-
-    with Timer("Building language detector"):
-        # Uses ALL languages
-        LANGUAGE_DETECTOR = LanguageDetectorBuilder.from_all_languages().with_preloaded_language_models().build()
-
-        # To specify the languages
-        # LANGUAGES = [Language.ENGLISH, Language.FRENCH, Language.GERMAN, Language.SPANISH, Language.ITALIAN]
-        # LANGUAGE_DETECTOR = LanguageDetectorBuilder.from_languages(*LANGUAGES).build()
-
-
-def fix_dicts_in_subjects(works: Works) -> None:
-    """
-    If any of the tags are a dict not a string, fix that!
-    """
-    with Timer("Fixing dicts in tags"):
-        for work in enumerate_progress(works, "works"):
-            # for work in works:
-            work.subjects = fix_dicts_in_list(work.subjects)
-            work.subject_people = fix_dicts_in_list(work.subject_people)
-            work.subject_places = fix_dicts_in_list(work.subject_places)
-            work.subject_times = fix_dicts_in_list(work.subject_times)
-
-
-def fix_dicts_in_list(strings: Strings) -> Strings:
-    """
-    If any of the strings is a dict, fix it
-    """
-
-    # if everything's a string (which happens most of the time) just return it
-    if all(isinstance(x, str) for x in strings):
-        return strings
-
-    # otherwise make a new list
-    ret: Strings = []
-    for tag in strings:
-        if isinstance(tag, dict):
-            value = tag["value"]
-            ret.append(value)
-        else:
-            ret.append(tag)
-
-    return ret
-
-
-def normalize_tag(tag: str) -> str:
-    """
-    Normalize Unicode and lowercase
-    NFKD stands for “Normalization Form Compatibility Decomposition.”
-    It is one of the Unicode normalization forms, makes text strings represented in a consistent way
-    """
-    return unicodedata.normalize("NFKD", tag).lower().strip()
-
-
+#
+# PARSING AND DOWNLOADING WORKS FILES
+#
 def parse_works_file(file_path: str = DEFAULT_FILENAME, line_limit: int = DEFAULT_LINE_LIMIT) -> Works:
     """
     Parses the file into a list of Work dataclasses
@@ -491,7 +457,10 @@ def download(
     return True
 
 
-def index_works_by_subject(works: Works) -> TagsToWorks:
+#
+# MISCELLANEOUS HELPERS
+#
+def get_tags_to_works(works: Works) -> TagsToWorks:
     """
     Returns a dict that maps tags to a list of each work that has the tag
     """
@@ -499,10 +468,15 @@ def index_works_by_subject(works: Works) -> TagsToWorks:
 
     for work in works:
         tags = get_tags_for_work(work)
+        if not tags:
+            ret[EMPTY].append(work)
+
         for tag in tags:
+            """
             if not isinstance(tag, str):
                 print(f"TAG TYPE: {type(tag)}: {tag}")
                 break
+            """
 
             ret[tag].append(work)
 
@@ -527,6 +501,49 @@ def get_tags_for_work(work: Work) -> Strings:
     return ret
 
 
+def fix_dicts_in_subjects(works: Works) -> None:
+    """
+    If any of the tags are a dict not a string, fix that!
+    """
+    with Timer("Fixing dicts in tags"):
+        for work in enumerate_progress(works, "works"):
+            # for work in works:
+            work.subjects = fix_dicts_in_list(work.subjects)
+            work.subject_people = fix_dicts_in_list(work.subject_people)
+            work.subject_places = fix_dicts_in_list(work.subject_places)
+            work.subject_times = fix_dicts_in_list(work.subject_times)
+
+
+def fix_dicts_in_list(strings: Strings) -> Strings:
+    """
+    If any of the strings is a dict, fix it. There's like a couple-dozen instances of this, total
+    """
+
+    # if everything's a string (which happens most of the time) just return it
+    if all(isinstance(x, str) for x in strings):
+        return strings
+
+    # otherwise make a new list
+    ret: Strings = []
+    for tag in strings:
+        if isinstance(tag, dict):
+            value = tag["value"]
+            ret.append(value)
+        else:
+            ret.append(tag)
+
+    return ret
+
+
+def normalize_tag(tag: str) -> str:
+    """
+    Normalize Unicode and lowercase
+    NFKD stands for “Normalization Form Compatibility Decomposition.”
+    It is one of the Unicode normalization forms, makes text strings represented in a consistent way
+    """
+    return unicodedata.normalize("NFKD", tag).lower().strip()
+
+
 def enumerate_progress(iterable: Iterable[T], label: str = "items", quanta: int = DEBUG_OUTPUT_QUANTA) -> Iterator[T]:
     """
     Wraps an iterable and yields each element while printing progress every `quanta` iterations.
@@ -540,6 +557,11 @@ def enumerate_progress(iterable: Iterable[T], label: str = "items", quanta: int 
             print(f"{i:,} {label} took {diff:,.1f}s")
 
         yield item
+
+
+def initialize(args: argparse.Namespace) -> None:
+    set_debug(args.debug)
+    initialize_language_detector()
 
 
 def set_debug(x: bool) -> None:
