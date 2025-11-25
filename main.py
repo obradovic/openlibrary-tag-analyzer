@@ -61,7 +61,6 @@ ENGLISH_DETECTOR: LanguageDetector | None
 LANGUAGE_DETECTOR: LanguageDetector | None
 
 BINS_TAGS_TO_COUNTS: Bins = [
-    (0, 0),
     (1, 1),
     (2, 2),
     (3, 3),
@@ -243,10 +242,10 @@ def analyze_tags(works: Works):
     # QUESTION: WHAT ARE THE MOST POPULAR TAGS?
     #
     # ###########################################
-    with Timer("Analyzing tag popularity"):
-        tags_by_count = sorted(tags_to_works.keys(), key=lambda tag: len(tags_to_works[tag]), reverse=True)
-        tags_to_count = {x: len(tags_to_works[x]) for x in tags_by_count}
-    display_histogram(tags_to_count.values(), BINS_TAGS_TO_COUNTS, title="Tag popularity")
+    with Timer("Analyzing tag counts"):
+        tags_by_tag_count = sorted(tags_to_works.keys(), key=lambda tag: len(tags_to_works[tag]), reverse=True)
+        tags_to_tag_count = {x: len(tags_to_works[x]) for x in tags_by_tag_count}
+    display_histogram(tags_to_tag_count.values(), BINS_TAGS_TO_COUNTS, title="Number of works that have this many tags")
 
     # maps the "number of tags" to a list of works
     # tag_counts_to_works = get_tag_counts_to_works(works)
@@ -313,10 +312,40 @@ def analyze_tags(works: Works):
 #
 # HISTOGRAMS
 #
+def display_histogram(counts: Iterable[int], bins: Bins, width: int = 50, title: str = "") -> None:
+    """
+    Histogram of raw values (each value contributes weight 1)
+    """
+    counts = list(counts)
+    if not counts:
+        print("No data to display")
+        return
+
+    bin_counts = compute_bin_counts(counts, [1] * len(counts), bins)
+    print_ascii_histogram(bins, bin_counts, width, title)
+
+
+def display_tag_count_histogram(data: dict[int, int], bins: Bins = [], width: int = 50, title: str = "") -> None:
+    """
+    Histogram where each tag_count has an associated weight = num tags
+    """
+    if not data:
+        print("No data to display")
+        return
+
+    bins = bins or BINS_TAG_COUNTS_TO_WORKS
+
+    values = data.keys()
+    weights = data.values()
+
+    bin_counts = compute_bin_counts(values, weights, bins)
+    print_ascii_histogram(bins, bin_counts, width, title)
 
 
 def compute_bin_counts(values: Iterable[int], weights: Iterable[int], bins: Bins) -> list[int]:
-    """Assign values (with weights) to bins and return weighted bin counts."""
+    """
+    Assign values (with weights) to bins and return weighted bin counts
+    """
     bin_counts = [0] * len(bins)
     for val, weight in zip(values, weights):
         for i, (start, end) in enumerate(bins):
@@ -327,10 +356,14 @@ def compute_bin_counts(values: Iterable[int], weights: Iterable[int], bins: Bins
 
 
 def print_ascii_histogram(bins: Bins, bin_counts: list[int], width: int, title: str) -> None:
-    """Print the ASCII histogram."""
+    """
+    Print the ASCII histogram
+    """
     max_count = max(bin_counts) if bin_counts else 0
 
+    title = title or "Histogram:"
     print(title)
+
     for (start, end), count in zip(bins, bin_counts):
         if end == float("inf"):
             label = f"{start}+"
@@ -340,119 +373,6 @@ def print_ascii_histogram(bins: Bins, bin_counts: list[int], width: int, title: 
         bar_length = int(count / max_count * width) if max_count else 0
         bar = "#" * bar_length
         print(f"{label:>8} | {bar} ({count:,})")
-
-
-def display_histogram(counts: Iterable[int], bins: Bins, width: int = 50, title: str = "Histogram:") -> None:
-    """Histogram of raw values (each value contributes weight 1)."""
-    counts = list(counts)
-    if not counts:
-        print("No data to display")
-        return
-
-    bin_counts = compute_bin_counts(counts, [1] * len(counts), bins)
-    print_ascii_histogram(bins, bin_counts, width, title)
-
-
-def display_tag_count_histogram(
-    tag_counts_to_works: dict[int, int], bins: Bins = [], width: int = 50, title: str = "Histogram:"
-) -> None:
-    """Histogram where each tag_count has an associated weight = num tags."""
-    if not tag_counts_to_works:
-        print("No data to display")
-        return
-
-    bins = bins or BINS_TAG_COUNTS_TO_WORKS
-
-    values = tag_counts_to_works.keys()
-    weights = tag_counts_to_works.values()
-
-    bin_counts = compute_bin_counts(values, weights, bins)
-    print_ascii_histogram(bins, bin_counts, width, title)
-
-
-'''
-def display_tag_count_histogram(
-    tag_counts_to_works: dict[int, int],
-    bins: list[tuple[int, int]] = None,
-    width: int = 50,
-    title: str = "Histogram: number of tags having N works",
-) -> None:
-    """
-    Display an ASCII histogram for tag_counts_to_works (mapping:
-    tag_count -> number_of_tags_with_that_count).
-
-    This function performs weighted binning (no expansion of millions
-    of entries) and prints the histogram.
-    """
-    if not tag_counts_to_works:
-        print("No data to display")
-        return
-
-    if bins is None:
-        bins = [
-            (0, 0),
-            (1, 1),
-            (2, 2),
-            (3, 3),
-            (4, 4),
-            (5, 5),
-            (6, 10),
-            (11, 20),
-            (21, 100),
-            (101, int("inf")),
-        ]
-
-    # Weighted bin counts: for each tag_count (key) add its frequency (value)
-    bin_counts = [0] * len(bins)
-    for tag_count, freq in tag_counts_to_works.items():
-        for i, (start, end) in enumerate(bins):
-            if start <= tag_count <= end:
-                bin_counts[i] += freq
-                break
-
-    max_count = max(bin_counts) if bin_counts else 0
-
-    print(title)
-    for (start, end), count in zip(bins, bin_counts):
-        if end == float("inf"):
-            label = f"{start}+"
-        else:
-            label = f"{start}" if start == end else f"{start}-{end}"
-
-        # Avoid division by zero if all counts are zero
-        bar_length = int(count / max_count * width) if max_count > 0 else 0
-        bar = "#" * bar_length
-        print(f"{label:>8} | {bar} ({count:,})")
-
-
-def display_histogram(counts: Iterable[int], bins: list[tuple[int, int]], width: int = 50, title: str = "") -> None:
-    """
-    Shows an ASCII histogram of tag sizes with custom bins
-    """
-    if not counts:
-        print("No data to display")
-        return
-
-    # Count how many tags fall into each bin
-    bin_counts = [0] * len(bins)
-    for size in counts:
-        for i, (start, end) in enumerate(bins):
-            if start <= size <= end:
-                bin_counts[i] += 1
-                break
-
-    max_count = max(bin_counts)
-
-    print(title)
-    for (start, end), count in zip(bins, bin_counts):
-        if end == float("inf"):
-            label = f"{start}+"
-        else:
-            label = f"{start}-{end}" if start != end else f"{start}"
-        bar_length = int(count / max_count * width)
-        bar = "#" * bar_length
-        print(f"{label:>8} | {bar} ({count:,})")
-'''
 
 
 #
