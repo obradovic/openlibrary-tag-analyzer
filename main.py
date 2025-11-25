@@ -20,7 +20,7 @@ USAGE:
 """
 
 import argparse
-from collections import defaultdict  # , Counter
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -40,6 +40,15 @@ import requests
 
 
 #
+# TYPE ALIASES
+#
+Bin = tuple[float, float]
+Bins = list[Bin]
+T = TypeVar("T")
+Strings = list[str]
+
+
+#
 # GLOBALS
 #
 DEBUG = False
@@ -51,12 +60,64 @@ EMPTY = ""
 ENGLISH_DETECTOR: LanguageDetector | None
 LANGUAGE_DETECTOR: LanguageDetector | None
 
+BINS_TAGS_TO_COUNTS: Bins = [
+    (0, 0),
+    (1, 1),
+    (2, 2),
+    (3, 3),
+    (4, 4),
+    (5, 5),
+    (6, 6),
+    (7, 7),
+    (8, 8),
+    (9, 9),
+    (10, 10),
+    (11, 11),
+    (12, 12),
+    (13, 13),
+    (14, 14),
+    (15, 15),
+    (16, 16),
+    (17, 17),
+    (18, 18),
+    (19, 19),
+    (20, 29),
+    (30, 39),
+    (40, 49),
+    (50, 59),
+    (60, 69),
+    (70, 79),
+    (80, 89),
+    (90, 99),
+    (100, 199),
+    (200, 299),
+    (300, 399),
+    (400, 499),
+    (500, float("inf")),
+]
+
+BINS_TAG_COUNTS_TO_WORKS: Bins = [
+    (0, 0),
+    (1, 1),
+    (2, 2),
+    (3, 3),
+    (4, 4),
+    (5, 5),
+    (6, 6),
+    (7, 7),
+    (8, 8),
+    (9, 9),
+    (10, 19),
+    (20, 29),
+    (30, 39),
+    (40, 100),
+    (101, float("inf")),
+]
+
 
 #
 # TYPES
 #
-T = TypeVar("T")
-Strings = list[str]
 
 # @dataclass
 # class AuthorRole:
@@ -94,6 +155,10 @@ class Work:
     # latest_revision: Optional[int] = None
     created: datetime | None = None
     # key: Optional[str] = None
+
+    # makes it hashable
+    def __hash__(self) -> int:
+        return hash(self.id)
 
 
 Works = list[Work]
@@ -141,21 +206,57 @@ def analyze_tags(works: Works):
     """
     Cursory analysis of tags
     """
-    # Sometimes we have tags that are serialized dicts, fix those
+    # Sanity check: sometimes we have tags that are serialized dicts, fix those
     fix_dicts_in_subjects(works)
 
     # invert into a map of tags-to-works
     tags_to_works = get_tags_to_works(works)
 
-    # sort by "number of items in the list"
-    tags_by_size = sorted(tags_to_works.keys(), key=lambda tag: len(tags_to_works[tag]), reverse=True)
-    tags_to_size = {x: len(tags_to_works[x]) for x in tags_by_size}
-    display_histogram(tags_to_size)
+    # keep a list of all the tag strings, in alphabetical order
+    tags = sorted(tags_to_works.keys())
 
-    # sort by keys in alphabetical order
-    tags_by_alphabetical = sorted(tags_by_size)
+    # ###########################################
+    #
+    # QUESTION: WHAT TAGS START OR END WITH A SPACE?
+    #
+    # ###########################################
+    with Timer("Analyzing whitespace"):
+        tags_with_leading_spaces = [x for x in tags if x and x[0].isspace()]
+        tags_with_trailing_spaces = [x for x in tags if x and x[-1].isspace()]
+    print(f"Discovered {len(tags_with_leading_spaces):,} tags with leading spaces")
+    print(f"Discovered {len(tags_with_trailing_spaces):,} tags with trailing spaces")
 
-    # get a list of the tags
+    # ###########################################
+    #
+    # QUESTION: HOW MANY TAGS DOES EACH WORK HAVE?
+    #
+    # ###########################################
+    with Timer("Analyzing tag counts per work"):
+        # works_to_tag_count = {x: len(get_tags_for_work(x)) for x in works}
+        works_to_tag_count = {x: get_tag_count_for_work(x) for x in works}
+        tag_counts_to_works = dict(Counter(works_to_tag_count.values()))
+        tag_counts_to_works = {x: tag_counts_to_works[x] for x in sorted(tag_counts_to_works.keys())}
+    display_tag_count_histogram(tag_counts_to_works, title="Tag count to 'number of works with that tag count':")
+
+    # ###########################################
+    #
+    # QUESTION: WHAT ARE THE MOST POPULAR TAGS?
+    #
+    # ###########################################
+    with Timer("Analyzing tag popularity"):
+        tags_by_count = sorted(tags_to_works.keys(), key=lambda tag: len(tags_to_works[tag]), reverse=True)
+        tags_to_count = {x: len(tags_to_works[x]) for x in tags_by_count}
+    display_histogram(tags_to_count.values(), BINS_TAGS_TO_COUNTS, title="Tag popularity")
+
+    # maps the "number of tags" to a list of works
+    # tag_counts_to_works = get_tag_counts_to_works(works)
+    # tag_counts_to_work_counts = {x: len(y) for x, y in tag_counts_to_works.items()}
+
+    # ###########################################
+    #
+    # QUESTION: HOW MANY TAGS OF WHAT TYPE ARE THERE
+    #
+    # ###########################################
     tags_general = [x.subjects for x in works if x.subjects]
     tags_people = [x.subject_people for x in works if x.subject_people]
     tags_places = [x.subject_places for x in works if x.subject_places]
@@ -179,8 +280,12 @@ def analyze_tags(works: Works):
     print(f"Places:  {count_places:<12,} / {count_all:<14,} is {count_places / count_all:.1%}")
     print(f"Times:   {count_times:<12,} / {count_all:<14,} is {count_times / count_all:.1%}")
 
-    # inspect the languages
-    tags_to_languages, languages_to_tags = analyze_languages(tags_by_alphabetical)
+    # ###########################################
+    #
+    # QUESTION: WHAT LANGUAGES ARE TAGS WRITTEN IN?
+    #
+    # ###########################################
+    tags_to_languages, languages_to_tags = analyze_languages(tags)
     languages_to_counts = {x: len(y) for x, y in languages_to_tags.items()}
     languages_to_counts_sorted = dict(sorted(languages_to_counts.items(), key=lambda x: x[1], reverse=True))
     print(languages_to_counts_sorted)
@@ -189,10 +294,6 @@ def analyze_tags(works: Works):
     # Normalize and count
     normalized_tags = [normalize_tag(tag) for tag in all_tags]
     tag_counter = Counter(normalized_tags)
-
-    # Find duplicates, misspellings, and capitalization differences
-    duplicates = [tag for tag, count in tag_counter.items() if count > 1]
-    print("Duplicate tags (case-insensitive):", duplicates)
 
     # Find tags differing only by capitalization
     case_variants = {}
@@ -206,56 +307,135 @@ def analyze_tags(works: Works):
         if len(variants) > 1:
             print(f"Case variants for '{norm}': {variants}")
 
-    # Find non-English tags (very basic heuristic)
-    non_english = [tag for tag in all_tags if not tag.isascii()]
-    print("Non-English tags:", non_english)
     """
 
 
-def display_histogram(tags_to_size: dict[str, int], width: int = 50) -> None:
-    """
-    Shows an ASCII histogram of tag sizes with custom bins:
-    0, 1, 2, 3, 4, 5, 6-10, 11-20, 21-100, 101+
-    """
-    if not tags_to_size:
+#
+# HISTOGRAMS
+#
+
+
+def compute_bin_counts(values: Iterable[int], weights: Iterable[int], bins: Bins) -> list[int]:
+    """Assign values (with weights) to bins and return weighted bin counts."""
+    bin_counts = [0] * len(bins)
+    for val, weight in zip(values, weights):
+        for i, (start, end) in enumerate(bins):
+            if start <= val <= end:
+                bin_counts[i] += weight
+                break
+    return bin_counts
+
+
+def print_ascii_histogram(bins: Bins, bin_counts: list[int], width: int, title: str) -> None:
+    """Print the ASCII histogram."""
+    max_count = max(bin_counts) if bin_counts else 0
+
+    print(title)
+    for (start, end), count in zip(bins, bin_counts):
+        if end == float("inf"):
+            label = f"{start}+"
+        else:
+            label = f"{start}" if start == end else f"{start}-{end}"
+
+        bar_length = int(count / max_count * width) if max_count else 0
+        bar = "#" * bar_length
+        print(f"{label:>8} | {bar} ({count:,})")
+
+
+def display_histogram(counts: Iterable[int], bins: Bins, width: int = 50, title: str = "Histogram:") -> None:
+    """Histogram of raw values (each value contributes weight 1)."""
+    counts = list(counts)
+    if not counts:
         print("No data to display")
         return
 
-    # Custom bins: (start, end) inclusive
-    bins = [
-        (1, 1),
-        (2, 2),
-        (3, 3),
-        (4, 4),
-        (5, 5),
-        (6, 6),
-        (7, 7),
-        (8, 8),
-        (9, 9),
-        (10, 10),
-        (11, 11),
-        (12, 12),
-        (13, 13),
-        (14, 14),
-        (15, 15),
-        (16, 16),
-        (17, 17),
-        (18, 18),
-        (19, 19),
-        (20, 29),
-        (30, 39),
-        (40, 49),
-        (50, 59),
-        (60, 69),
-        (70, 79),
-        (80, 89),
-        (90, 99),
-        (101, float("inf")),
-    ]
+    bin_counts = compute_bin_counts(counts, [1] * len(counts), bins)
+    print_ascii_histogram(bins, bin_counts, width, title)
+
+
+def display_tag_count_histogram(
+    tag_counts_to_works: dict[int, int], bins: Bins = [], width: int = 50, title: str = "Histogram:"
+) -> None:
+    """Histogram where each tag_count has an associated weight = num tags."""
+    if not tag_counts_to_works:
+        print("No data to display")
+        return
+
+    bins = bins or BINS_TAG_COUNTS_TO_WORKS
+
+    values = tag_counts_to_works.keys()
+    weights = tag_counts_to_works.values()
+
+    bin_counts = compute_bin_counts(values, weights, bins)
+    print_ascii_histogram(bins, bin_counts, width, title)
+
+
+'''
+def display_tag_count_histogram(
+    tag_counts_to_works: dict[int, int],
+    bins: list[tuple[int, int]] = None,
+    width: int = 50,
+    title: str = "Histogram: number of tags having N works",
+) -> None:
+    """
+    Display an ASCII histogram for tag_counts_to_works (mapping:
+    tag_count -> number_of_tags_with_that_count).
+
+    This function performs weighted binning (no expansion of millions
+    of entries) and prints the histogram.
+    """
+    if not tag_counts_to_works:
+        print("No data to display")
+        return
+
+    if bins is None:
+        bins = [
+            (0, 0),
+            (1, 1),
+            (2, 2),
+            (3, 3),
+            (4, 4),
+            (5, 5),
+            (6, 10),
+            (11, 20),
+            (21, 100),
+            (101, int("inf")),
+        ]
+
+    # Weighted bin counts: for each tag_count (key) add its frequency (value)
+    bin_counts = [0] * len(bins)
+    for tag_count, freq in tag_counts_to_works.items():
+        for i, (start, end) in enumerate(bins):
+            if start <= tag_count <= end:
+                bin_counts[i] += freq
+                break
+
+    max_count = max(bin_counts) if bin_counts else 0
+
+    print(title)
+    for (start, end), count in zip(bins, bin_counts):
+        if end == float("inf"):
+            label = f"{start}+"
+        else:
+            label = f"{start}" if start == end else f"{start}-{end}"
+
+        # Avoid division by zero if all counts are zero
+        bar_length = int(count / max_count * width) if max_count > 0 else 0
+        bar = "#" * bar_length
+        print(f"{label:>8} | {bar} ({count:,})")
+
+
+def display_histogram(counts: Iterable[int], bins: list[tuple[int, int]], width: int = 50, title: str = "") -> None:
+    """
+    Shows an ASCII histogram of tag sizes with custom bins
+    """
+    if not counts:
+        print("No data to display")
+        return
 
     # Count how many tags fall into each bin
     bin_counts = [0] * len(bins)
-    for size in tags_to_size.values():
+    for size in counts:
         for i, (start, end) in enumerate(bins):
             if start <= size <= end:
                 bin_counts[i] += 1
@@ -263,7 +443,7 @@ def display_histogram(tags_to_size: dict[str, int], width: int = 50) -> None:
 
     max_count = max(bin_counts)
 
-    print("Histogram of how many works have this number of tags")
+    print(title)
     for (start, end), count in zip(bins, bin_counts):
         if end == float("inf"):
             label = f"{start}+"
@@ -272,6 +452,7 @@ def display_histogram(tags_to_size: dict[str, int], width: int = 50) -> None:
         bar_length = int(count / max_count * width)
         bar = "#" * bar_length
         print(f"{label:>8} | {bar} ({count:,})")
+'''
 
 
 #
@@ -468,16 +649,12 @@ def get_tags_to_works(works: Works) -> TagsToWorks:
 
     for work in works:
         tags = get_tags_for_work(work)
+        """
         if not tags:
             ret[EMPTY].append(work)
+        """
 
         for tag in tags:
-            """
-            if not isinstance(tag, str):
-                print(f"TAG TYPE: {type(tag)}: {tag}")
-                break
-            """
-
             ret[tag].append(work)
 
     return ret
@@ -487,17 +664,36 @@ def get_tags_for_work(work: Work) -> Strings:
     """
     Returns all tags for a work, in a flattened list. This of course loses the information about which field a tag was in!
     """
-    ret: Strings = []
+    ret = []
 
-    # tags can be in any of these fields
-    subject_fields = [work.subjects, work.subject_people, work.subject_places, work.subject_times]
+    ret.extend(work.subjects)
+    ret.extend(work.subject_people)
+    ret.extend(work.subject_places)
+    ret.extend(work.subject_times)
 
-    for subject_field in subject_fields:
-        for tag in subject_field:
-            if tag:
-                ret.append(tag)
+    return ret
 
-    ret = sorted(ret)
+
+def get_tag_count_for_work(work: Work) -> int:
+    """
+    Returns the number of tags this work has
+    """
+    return len(work.subjects) + len(work.subject_people) + len(work.subject_places) + len(work.subject_times)
+
+
+def get_tag_counts_to_works(works: Works) -> dict[int, Works]:
+    """
+    Returns a dict of tag counts to works that have that tag count
+    """
+    ret = defaultdict(list)
+
+    for work in works:
+        # tags = get_tags_for_work(work)
+        # tag_count = len(tags)
+        tag_count = get_tag_count_for_work(work)
+
+        ret[tag_count].append(work)
+
     return ret
 
 
