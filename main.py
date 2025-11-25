@@ -219,6 +219,7 @@ def analyze_tags(works: Works):
     # QUESTION: WHAT TAGS START OR END WITH A SPACE?
     #
     # ###########################################
+    print()
     with Timer("Analyzing whitespace"):
         tags_with_leading_spaces = [x for x in tags if x and x[0].isspace()]
         tags_with_trailing_spaces = [x for x in tags if x and x[-1].isspace()]
@@ -230,28 +231,31 @@ def analyze_tags(works: Works):
     # QUESTION: HOW MANY TAGS DOES EACH WORK HAVE?
     #
     # ###########################################
+    print()
     with Timer("Analyzing tag counts per work"):
         # works_to_tag_count = {x: len(get_tags_for_work(x)) for x in works}
         works_to_tag_count = {x: get_tag_count_for_work(x) for x in works}
         tag_counts_to_works = dict(Counter(works_to_tag_count.values()))
         tag_counts_to_works = {x: tag_counts_to_works[x] for x in sorted(tag_counts_to_works.keys())}
-    display_tag_count_histogram(tag_counts_to_works, title="Tag count to 'number of works with that tag count':")
+    display_tag_count_histogram(tag_counts_to_works, title="Tag count to 'number of works with this many tags':")
 
     # ###########################################
     #
     # QUESTION: WHAT ARE THE MOST POPULAR TAGS?
     #
     # ###########################################
-    with Timer("Analyzing tag counts"):
+    print()
+    with Timer("Analyzing tag counts per tag"):
         tags_by_tag_count = sorted(tags_to_works.keys(), key=lambda tag: len(tags_to_works[tag]), reverse=True)
         tags_to_tag_count = {x: len(tags_to_works[x]) for x in tags_by_tag_count}
-    display_histogram(tags_to_tag_count.values(), BINS_TAGS_TO_COUNTS, title="Number of works that have this many tags")
+    display_histogram(tags_to_tag_count.values(), BINS_TAGS_TO_COUNTS, title="Number of tags repeated this many times")
 
     # ###########################################
     #
     # QUESTION: HOW MANY TAGS OF WHAT TYPE ARE THERE
     #
     # ###########################################
+    print()
     with Timer("Analyzing tag categories"):
         tags_general = [x.subjects for x in works if x.subjects]
         tags_people = [x.subject_people for x in works if x.subject_people]
@@ -281,6 +285,7 @@ def analyze_tags(works: Works):
     # QUESTION: WHAT LANGUAGES ARE TAGS WRITTEN IN?
     #
     # ###########################################
+    print()
     with Timer("Analyzing tag languages"):
         tags_to_languages, languages_to_tags = analyze_languages(tags)
         languages_to_counts = {x: len(y) for x, y in languages_to_tags.items()}
@@ -289,6 +294,11 @@ def analyze_tags(works: Works):
         language_name = language.name.capitalize() if language else "Unknown"
         print(f"  {language_name:<14} has {count:,} tags")
 
+    # ###########################################
+    #
+    # QUESTION: HOW MANY TAGS DIFFER ONLY BY CAPITALIZATION
+    #
+    # ###########################################
     """
     # Normalize and count
     normalized_tags = [normalize_tag(tag) for tag in all_tags]
@@ -307,6 +317,12 @@ def analyze_tags(works: Works):
             print(f"Case variants for '{norm}': {variants}")
 
     """
+
+    # ###########################################
+    #
+    # QUESTION: HOW MANY TAGS DIFFER ONLY BY PLURALIZATION
+    #
+    # ###########################################
 
 
 #
