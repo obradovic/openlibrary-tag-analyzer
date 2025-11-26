@@ -39,6 +39,9 @@ uv-sync:
 uv-update:
     {{UV}} self update
 
+uv-update-packages:
+    {{UV}} lock --upgrade
+    {{UV}} sync
 
 sync:
     @{{UV}} sync
