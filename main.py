@@ -25,6 +25,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 import gzip
+import re
 import shutil
 import sys
 import time
@@ -32,9 +33,8 @@ from typing import Iterable, Iterator, TypeVar
 import unicodedata
 
 import ciso8601
+import inflect
 from lingua import Language, LanguageDetector, LanguageDetectorBuilder
-
-# import matplotlib.pyplot as plt
 import orjson
 import requests
 
@@ -213,6 +213,7 @@ def analyze_tags(works: Works):
 
     # keep a list of all the tag strings, in alphabetical order
     tags = sorted(tags_to_works.keys())
+    # tags_lowercase = sorted(list(set([x.lower() for x in tags])))
 
     # ###########################################
     #
@@ -285,6 +286,8 @@ def analyze_tags(works: Works):
     # QUESTION: WHAT LANGUAGES ARE TAGS WRITTEN IN?
     #
     # ###########################################
+
+    # NOTE: It detects English when they're not really? See "Čhulālongkō̜nmahāwitthayālai"
     print()
     with Timer("Analyzing tag languages"):
         tags_to_languages, languages_to_tags = analyze_languages(tags)
@@ -331,7 +334,50 @@ def analyze_tags(works: Works):
 
     # ###########################################
     #
+    # QUESTION: HOW MANY TAGS HAVE DOUBLE-SPACES, or DOUBLE-PUNCTUATION, OR NEWLINES
+    #
+    # ###########################################
+    with Timer("Analyzing punctuation errors"):
+        double_dashes = [x for x in tags if "--" in x]
+        double_spaces = [x for x in tags if "  " in x]
+        newlines = [x for x in tags if "\n" in x]
+        # at_sign = [x for x in tags if "@" in x]
+
+        double_punctuation_pattern = (
+            r"([!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~])\1|([!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~])\2"
+        )
+        double_punctuations = []
+        for tag in tags:
+            matches = re.findall(double_punctuation_pattern, tag)
+            if matches:
+                double_punctuations.append(tag)
+
+    print(f"  {len(double_dashes):,} tags have double-dashes")
+    print(f"  {len(double_spaces):,} tags have double-spaces")
+    print(f"  {len(newlines):,} tags have newlines")
+    print(f"  {len(double_punctuations):,} tags have double-punctuation characters")
+
+    # ###########################################
+    #
     # QUESTION: HOW MANY TAGS DIFFER ONLY BY PLURALIZATION
+    #
+    # ###########################################
+    # NOTE: the unimorph_inflect package could possibly help with non-English languages?
+    print()
+    with Timer("Analyzing pluralization (English only)"):
+        english_tags = languages_to_tags[Language.ENGLISH]
+        singular_to_plurals = get_plural_map(english_tags)
+
+    print(f"  {len(singular_to_plurals):,} issues with pluralization:")
+    for i, (singular, plurals) in enumerate(singular_to_plurals.items()):
+        plurals_display = ", ".join(plurals)
+        print(f"  {singular} has {len(plurals)} plurals: {plurals_display}")
+        if i == 20:
+            break
+
+    # ###########################################
+    #
+    # QUESTION: HOW MANY MISSPELLINGS ARE THERE?
     #
     # ###########################################
 
@@ -420,7 +466,7 @@ def initialize_language_detector() -> None:
 
 def analyze_languages(tags: Strings) -> tuple[dict[str, Language], dict[Language, Strings]]:
     """
-    Returns two dicts,
+    Returns two dicts, the second being the inverse of the first.
     """
     tags_to_languages = {}
     languages_to_tags = defaultdict(list)
@@ -588,6 +634,37 @@ def download(
 #
 # MISCELLANEOUS HELPERS
 #
+def get_plural_map(tags: Strings) -> dict[str, Strings]:
+    """
+    Figures out what the plurals are
+    """
+    tags = sorted(list(set([x.lower() for x in tags])))  # Lowercase everything
+    tags = [x.strip() for x in tags]  # Remove leading/trailing whitespace
+
+    tags_set = set(tags)  # For O(1) testing
+    inflector = inflect.engine()
+
+    ret = defaultdict(list)
+    for tag in tags:
+        if " " in tag or "--" in tag:
+            continue
+
+        singular = inflector.singular_noun(tag)
+
+        # if this is already singular
+        if singular == tag:
+            continue
+
+        if singular in tags_set:
+            if tag not in ret[singular]:
+                ret[singular].append(tag)
+
+    # Remove anything that doesnt have plural variants
+    ret = {x: y for x, y in ret.items() if len(y) > 1}
+
+    return ret
+
+
 def get_capitalization_variants(strings: Strings) -> dict[str, Strings]:
     """
     Returns a dict mapping the lowercase string to a list of all its capitalization variants
