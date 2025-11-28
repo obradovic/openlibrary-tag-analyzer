@@ -1,6 +1,8 @@
 NOTES:
     First pass:
         Make them all lowercase
+        Remove ANSI escape codes from tags
+        Remove parenthesis from tags
 
     People:
         "Jiazhou Zhou (b. 1582)"    # the "b." prefix?
