@@ -1,6 +1,6 @@
 """
 Examines OpenLibrary tags.
-(Optionally) downloads the latest works file, and performs rudimentary analysis
+(Optionally) downloads the latest works file, and performs rudimentary analysis on the tags it contains
 
 SETUP:
   python -m textblob.download_corpora
@@ -67,9 +67,14 @@ EMPTY = ""
 ENGLISH_DETECTOR: LanguageDetector | None
 LANGUAGE_DETECTOR: LanguageDetector | None
 
+DASH = "-"
+DOUBLE_DASH = "--"
+DOUBLE_SPACE = "  "
 EMPTY = ""
+NL = "\n"
 LPAREN = "("
 RPAREN = ")"
+SPACE = " "
 
 ANSI_ESCAPE_PATTERN = r"(?:\x1B[@-Z\\-_]|[\x80-\x9A\x9C-\x9F]|(?:\x1B\[|\x9B)[0-?]*[ -/]*[@-~])"
 ANSI_ESCAPE_REGEXP = re.compile(ANSI_ESCAPE_PATTERN)
@@ -354,24 +359,11 @@ def analyze_tags(works: Works):
     #
     # ###########################################
     with Timer("Analyzing punctuation errors"):
-        double_dashes = [x for x in tags if "--" in x]
-        double_spaces = [x for x in tags if "  " in x]
-        newlines = [x for x in tags if "\n" in x]
-        # at_sign = [x for x in tags if "@" in x]
+        double_dash_map = get_regexp_map(tags, r"-+", DASH)
+        whitespace_map = get_regexp_map(tags, r"\s+", SPACE)  # matches tabs, newlines
 
-        double_punctuation_pattern = (
-            r"([!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~])\1|([!\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~])\2"
-        )
-        double_punctuations = []
-        for tag in tags:
-            matches = re.findall(double_punctuation_pattern, tag)
-            if matches:
-                double_punctuations.append(tag)
-
-    print(f"  {len(double_dashes):,} tags have double-dashes")
-    print(f"  {len(double_spaces):,} tags have double-spaces")
-    print(f"  {len(newlines):,} tags have newlines")
-    print(f"  {len(double_punctuations):,} tags have double-punctuation characters")
+    print(f"  {len(double_dash_map):,} tags have double-dashes")
+    print(f"  {len(whitespace_map):,} tags have multiple consecutive whitespace characters")
 
     # ###########################################
     #
@@ -720,6 +712,14 @@ def download(
 #
 # MISCELLANEOUS HELPERS
 #
+def get_regexp_map(tags: Strings, regexp: str, replacement_string: str) -> dict[str, str]:
+    """
+    Returns a map of strings-to-replacement-strings, replacing the pattern with the substring for each
+    """
+    ret = {x: re.sub(regexp, replacement_string, x) for x in tags}
+    ret = {x: y for x, y in ret.items() if x != y}
+    ret = {x: y.strip() for x, y in ret.items()}
+    return ret
 
 
 def contains_ansi_escape_codes(string: str) -> bool:
