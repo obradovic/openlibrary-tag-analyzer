@@ -1,8 +1,8 @@
 NOTES:
     First pass:
-        Make them all lowercase
-        Remove ANSI escape codes from tags
-        Remove parenthesis from tags
+        Remove leading/trailing spaces
+        Remove leading/trailing parenthesis
+        Remove newlines in tags
 
     People:
         "Jiazhou Zhou (b. 1582)"    # the "b." prefix?
@@ -121,6 +121,9 @@ NOTES:
     Suggest tags, based on content or summary analysis, or wikipedia metadata analysis, or other books by the author(s)
     Which books or authors have similar tags?
     Should we tag authors as well?
+
+    Make them all lowercase?
+    Remove ANSI escape codes from tags
 
     Create a slack bot to:
         /tag chinese
