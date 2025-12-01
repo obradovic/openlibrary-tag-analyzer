@@ -383,11 +383,11 @@ def analyze_tags(works: Works):
     #
     # ###########################################
     with Timer("Analyzing punctuation errors"):
-        double_dash_map = get_regexp_map(tags, r"-+", DASH)
-        whitespace_map = get_regexp_map(tags, r"\s+", SPACE)  # matches tabs, newlines
+        multiple_dash_map = get_regexp_map(tags, r"-+", DASH)
+        multiple_whitespace_map = get_regexp_map(tags, r"\s+", SPACE)  # matches tabs, newlines
 
-    print(f"  {len(double_dash_map):,} tags have double-dashes")
-    print(f"  {len(whitespace_map):,} tags have multiple consecutive whitespace characters")
+    print(f"  {len(multiple_dash_map):,} tags have multiple consecutive dashes")
+    print(f"  {len(multiple_whitespace_map):,} tags have multiple consecutive whitespace characters")
 
     # ###########################################
     #
