@@ -114,26 +114,25 @@ NOTES:
             "War of 1812"                   # Should be the years of the war
             "A autobiography of a paranormal life till the age of 43."
 
-        How to match with an ASCII search?
+        How to match with an ASCII search? Does Solr take care of this somehow?
             "Chosŏn dynasty, 1392-1910"
 
-        How to specify a time that ends in BC? "-300--200" ?
+        How to specify a time that ends in BC? "-300--200" ? Standardize BCE/BC/B.C./etc
             "1100 BCE"
             "281-146 B.C."
             "Greco Roman period, 332 B.C.-640 A.D."
 
     Can we infer tags from the text? Or from the wikipedia page for a work?
 
-    If tags overlap, can we detect and remove synonyms?
+    If tags overlap, can we detect and remove synonyms? Deeper philosophical issue
 
     Eliminate leading/trailing spaces:
         ' Canada',
         ' Québec (Province)'
 
     Use consistent naming:
-        all lowercase
-        all singular no plural
-        all english (?? and translate to other languages as needed ??  in realtime??)
+        all lowercase?
+        all singular no plural?
 
     Keep track of both "as-entered tags" and "sanitized tags"
         Prefer sanitized tags when searching
@@ -170,7 +169,7 @@ NOTES:
             "chinese dramatists" could reasonably be either "dramatists:chinese" or "chinese:dramatists"
             In this case, split into two tags, "chinese" and "dramatists"
 
-    If there will only ever be one book with this tag, it should not be a tag?
+    If there will only ever be one book with this tag, it should not be a tag (?)
         ie dont tag "isbn:234234234"
 
     Define synonyms in Solr:
@@ -182,7 +181,6 @@ NOTES:
     Which books or authors have similar tags?
     Should we tag authors as well?
 
-    Make them all lowercase?
     Remove ANSI escape codes from tags
 
     Create a slack bot to:
@@ -191,7 +189,7 @@ NOTES:
 
     Accept free-form input for tags, but then validate it and present it for approval to the librarian?
 
-    Keep track of who has sanitized tags
+    Keep track of who has sanitized tags, Keep a recorded history so we can always go back to "what were the tags at this specific point=in-time"
     Keep track of deleted / modified tags?  So we can keep a "tagging history", revert back to previous tags, track tag migration over time?
 
 
