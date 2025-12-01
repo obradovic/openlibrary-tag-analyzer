@@ -63,7 +63,7 @@ DEBUG_OUTPUT_QUANTA = 250_000
 DEFAULT_LINE_LIMIT = 0
 DEFAULT_FILENAME = "works.txt"
 DEFAULT_WORKS_URL = "https://openlibrary.org/data/ol_dump_works_latest.txt.gz"
-PRINT_LIMIT = 20
+PRINT_LIMIT = 20 - 1  # -1 cause we do it at the end of the print loop
 
 DASH = "-"
 DOUBLE_DASH = "--"
@@ -129,8 +129,9 @@ HISTOGRAM_BINS_TAG_COUNTS_TO_WORKS: Bins = [
     (10, 19),
     (20, 29),
     (30, 39),
-    (40, 100),
-    (101, float("inf")),
+    (40, 49),
+    (50, 99),
+    (100, float("inf")),
 ]
 
 
@@ -254,8 +255,10 @@ def analyze_tags(works: Works):
     with Timer("Analyzing whitespace"):
         tags_with_leading_spaces = [x for x in tags if x and x[0].isspace()]
         tags_with_trailing_spaces = [x for x in tags if x and x[-1].isspace()]
+        tags_with_either_spaces = sorted(list(set(tags_with_leading_spaces + tags_with_trailing_spaces)))
     print(f"Discovered {len(tags_with_leading_spaces):,} tags with leading spaces")
     print(f"Discovered {len(tags_with_trailing_spaces):,} tags with trailing spaces")
+    print(f"Discovered {len(tags_with_either_spaces):,} tags with either spaces")
 
     # ###########################################
     #
@@ -283,6 +286,12 @@ def analyze_tags(works: Works):
         tags_to_tag_count.values(), HISTOGRAM_BINS_TAGS_TO_COUNTS, title="Number of tags repeated this many times:"
     )
 
+    for i, (tag, tag_count) in enumerate(tags_to_tag_count.items()):
+        print(f"  {tag_count:<10,} works are tagged with '{tag}'")
+
+        if i == PRINT_LIMIT:
+            break
+
     # ###########################################
     #
     # QUESTION: HOW MANY TAGS OF WHAT TYPE (PEOPLE/PLACES/TIMES) ARE THERE?
@@ -308,6 +317,7 @@ def analyze_tags(works: Works):
         count_places = len(flattened_places)
         count_times = len(flattened_times)
         count_all = len(flattened_all)
+
     print(f"General: {count_general:<12,} / {count_all:<14,} is {count_general / count_all:.1%}")
     print(f"People:  {count_people:<12,} / {count_all:<14,} is {count_people / count_all:.1%}")
     print(f"Places:  {count_places:<12,} / {count_all:<14,} is {count_places / count_all:.1%}")
@@ -323,6 +333,7 @@ def analyze_tags(works: Works):
         tags_to_languages, languages_to_tags = analyze_languages(tags)
         languages_to_counts = {x: len(y) for x, y in languages_to_tags.items()}
         languages_to_counts_sorted = dict(sorted(languages_to_counts.items(), key=lambda x: x[1], reverse=True))
+
     for i, (language, count) in enumerate(languages_to_counts_sorted.items()):
         language_name = language.name.capitalize() if language else "Unknown"
         print(f"  {language_name:<14} has {count:,} tags")
